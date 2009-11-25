@@ -10,12 +10,13 @@ type Token int
 const (
 	ILLEGAL	Token	= iota;
 	EOF;
-	COMMENT;
 
+	INT;	// 345
+	FLOAT:	// 4.34
 	LABEL;	// foo:
 	STRING;	// "foo"
-	COMMA;	// ,
-	COLON;	// :
+	REG:	// $r3
+	FPREG:	// $f3
 )
 
 type Position struct {

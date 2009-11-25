@@ -6,12 +6,21 @@ import (
 	"strconv";
 )
 
+func isLetter(char int) bool {
+	return	('a' <= char && char <= 'z') || ('A' <= char && char <= 'Z') ||
+			(char == '_')
+}
+
+func isDigit(char int) bool {
+	return '0' <= char && char <= '9'
+}
+
 type Scanner struct {
 	input	[]byte;
 
 	pos		token.Position;
 	offset	int;
-	char	int;
+	c	int;
 }
 
 func (S *Scanner) Init(filename string, input []byte) {
@@ -31,19 +40,20 @@ func (S *Scanner) next() {
 			S.pos.Column = 0;
 		}
 		S.offset += 1;
-		S.char = r;
+		S.c = r;
 	} else {
 		S.pos.Offset = len(S.input);
-		S.char = -1;
+		S.c = -1;
 	}
 }
 
 func (S *Scanner) Scan() (pos token.Position, tok token.Token, word []byte) {
 restart_scan:
-	for S.char == ' ' || S.char == '\t' || S.char == '\n' || S.char == '\r' {
+	for S.c == ' ' || S.c == '\t' || S.c == '\n' || S.c == '\r' {
 		S.next()
 	}
-	if S.ch == '#' { // Found a comment; go to next line and restart scan
+	switch c := S.c {
+	case == '#' { // Found a comment; go to next line and restart scan
 		for S.pos.Column != 0 {
 			S.next()
 		}
