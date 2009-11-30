@@ -1,11 +1,8 @@
-package gomps
+package token
 
-/*
 import (
-    "fmt";
-    "strconv";
+	"fmt";
 )
-*/
 
 type Token int
 
@@ -26,6 +23,32 @@ const (
 	RPAREN;
 )
 
+var tokens = map[Token] string {
+	ILLEGAL: "ILLEGAL",
+	EOF: "EOF",
+
+	INT: "INT",
+	FLOAT: "FLOAT",
+	STRING: "STRING",
+
+	LABEL: "LABEL",
+	INSTR: "INSTR",
+	DIRECTIVE: "DIRECTIVE",
+	REG: "REG",
+	FPREG: "FPREG",
+
+	LPAREN: "(",
+	RPAREN: ")"
+}
+
+
+func (tok Token) String() string {
+	if str, ok := tokens[tok]; ok {
+		return str
+	}
+	return "unknown_tok"
+}
+
 type Position struct {
 	Filename	string;
 	Offset		int;
@@ -33,33 +56,6 @@ type Position struct {
 	Column		int;
 }
 
-func tokToString(tok Token) string {
-	var str string;
-	switch tok {
-	case ILLEGAL:
-		str = "ILLEGAL"
-	case EOF:
-		str = "EOF"
-	case INT:
-		str = "INT"
-	case FLOAT:
-		str = "FLOAT"
-	case LABEL:
-		str = "LABEL"
-	case STRING:
-		str = "STRING"
-	case REG:
-		str = "REG"
-	case FPREG:
-		str = "FPREG"
-	case INSTR:
-		str = "INSTR"
-	case DIRECTIVE:
-		str = "DIRECTIVE"
-	case LPAREN:
-		str = "LPAREN"
-	case RPAREN:
-		str = "RPAREN"
-	}
-	return str;
+func (pos Position) String() string {
+	return fmt.Sprintf("%s @ %d:%d", pos.Filename, pos.Line, pos.Column);
 }
