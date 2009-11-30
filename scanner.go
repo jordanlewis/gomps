@@ -1,14 +1,9 @@
 package gomps
 
-/*
-import (
-	"bytes";
-	"strconv";
-)
-*/
 import (
 	"fmt";
 	"io";
+	"container/vector";
 )
 
 func reportError(err string, pos Position) {
@@ -25,12 +20,39 @@ func isDigit(char int) bool {
 	return '0' <= char && char <= '9'
 }
 
+
+type TokenData struct {
+	pos		Position;
+	tok		Token;
+	str		[]byte;
+}
+
+type TokenStream struct {
+	list	*vector.Vector;
+	curTok	int;
+}
+
 type Scanner struct {
 	input	[]byte;
 
 	pos		Position;
 	offset	int;
 	c	int;
+}
+
+func (T *TokenStream) Init() {
+	T.list = vector.New(0);
+	T.curTok = 0;
+}
+
+func (T *TokenStream) Push(td *TokenData) {
+	T.list.Push(td);
+}
+
+func (T *TokenStream) Next() *TokenData {
+	ret := T.list.At(T.curTok).(TokenData);
+	T.curTok++;
+	return &ret;
 }
 
 func (S *Scanner) Init(filename string, input []byte) {
@@ -163,14 +185,20 @@ restart_scan:
 // 	}
 // 	return 0;
 // }
-func Tokenize(filename string) {
+func Tokenize(filename string) *TokenStream {
+	var stream *TokenStream;
 	var s Scanner;
+	var t *TokenData;
+	stream.Init();
 	input, _ := io.ReadFile(filename);
 	s.Init(filename, input);
 	token := ILLEGAL;
 	for token != EOF {
 		pos, tok, word := s.Scan();
+		t = &TokenData{pos, tok, word};
+		stream.Push(t);
 		token = tok;
 		fmt.Printf("%s@%d(%d:%d) %s %s\n", pos.Filename, pos.Offset, pos.Line, pos.Column, tokToString(token), word);
 	}
+	return stream;
 }
