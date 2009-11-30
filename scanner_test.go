@@ -1,6 +1,10 @@
 package gomps
 
-import ("testing"; "io"; "fmt";)
+import (
+	"testing";
+	"io";
+	"fmt";
+)
 
 func spewTokens(filename string) {
 	var s Scanner;

@@ -8,23 +8,21 @@ import (
 
 func reportError(err string, pos Position) {
 	fmt.Printf("Error in scanning: %s.%s:%s): %s\n", pos.Filename,
-			   pos.Line, pos.Column, err);
+		pos.Line, pos.Column, err)
 }
 
 func isLetter(char int) bool {
-	return	('a' <= char && char <= 'z') || ('A' <= char && char <= 'Z') ||
-			(char == '_') || (char == '.')
+	return ('a' <= char && char <= 'z') || ('A' <= char && char <= 'Z') ||
+		(char == '_') || (char == '.')
 }
 
-func isDigit(char int) bool {
-	return '0' <= char && char <= '9'
-}
+func isDigit(char int) bool	{ return '0' <= char && char <= '9' }
 
 
 type TokenData struct {
-	pos		Position;
-	tok		Token;
-	str		[]byte;
+	pos	Position;
+	tok	Token;
+	str	[]byte;
 }
 
 type TokenStream struct {
@@ -35,7 +33,7 @@ type TokenStream struct {
 type Scanner struct {
 	input	[]byte;
 
-	pos		Position;
+	pos	Position;
 	offset	int;
 	c	int;
 }
@@ -45,9 +43,7 @@ func (T *TokenStream) Init() {
 	T.curTok = 0;
 }
 
-func (T *TokenStream) Push(td *TokenData) {
-	T.list.Push(td);
-}
+func (T *TokenStream) Push(td *TokenData)	{ T.list.Push(td) }
 
 func (T *TokenStream) Next() *TokenData {
 	ret := T.list.At(T.curTok).(TokenData);
@@ -65,7 +61,7 @@ func (S *Scanner) Init(filename string, input []byte) {
 func (S *Scanner) scanIdentifier() Token {
 	tok := INSTR;
 	if S.c == '.' {
-		tok = DIRECTIVE;
+		tok = DIRECTIVE
 	}
 	for isLetter(S.c) || isDigit(S.c) {
 		S.next()
@@ -73,9 +69,9 @@ func (S *Scanner) scanIdentifier() Token {
 	if S.c == ':' {
 		S.next();
 		if tok == DIRECTIVE {
-			tok = ILLEGAL;
+			tok = ILLEGAL
 		} else {
-			tok = LABEL;
+			tok = LABEL
 		}
 	}
 	return tok;
@@ -93,7 +89,7 @@ func (S *Scanner) scanEscape() {
 	switch S.c {
 	case 'a', 'b', 'f', 'n', 'r', 't', 'v', '\\', '"':
 	default:
-		fmt.Printf("Illegal character escape\n");
+		fmt.Printf("Illegal character escape\n")
 	}
 }
 
@@ -104,7 +100,7 @@ func (S *Scanner) scanString() {
 			break;
 		}
 		if S.c == '\\' {
-			S.scanEscape();
+			S.scanEscape()
 		}
 		S.next();
 	}
@@ -164,11 +160,11 @@ restart_scan:
 		case ')':
 			tok = RPAREN
 
-		case '#': // Found a comment; go to next line and restart scan
+		case '#':	// Found a comment; go to next line and restart scan
 			for S.pos.Column != 0 {
 				S.next()
 			}
-			goto restart_scan
+			goto restart_scan;
 		default:
 			fmt.Printf("Illegal char %c\n", c);
 			tok = EOF;
@@ -181,7 +177,7 @@ restart_scan:
 // 	var s Scanner;
 // 	s.Init(filename, input);
 // 	for f(s.Scan()) {
-// 		
+//
 // 	}
 // 	return 0;
 // }

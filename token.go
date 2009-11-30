@@ -13,13 +13,13 @@ const (
 	ILLEGAL	Token	= iota;
 	EOF;
 
-	INT;	// 345
-	FLOAT;	// 4.34
-	LABEL;	// foo:
-	STRING;	// "foo"
-	REG;	// $r3
-	FPREG;	// $f3
-	INSTR;	// abs.d
+	INT;		// 345
+	FLOAT;		// 4.34
+	LABEL;		// foo:
+	STRING;		// "foo"
+	REG;		// $r3
+	FPREG;		// $f3
+	INSTR;		// abs.d
 	DIRECTIVE;	//.align
 
 	LPAREN;
@@ -33,21 +33,33 @@ type Position struct {
 	Column		int;
 }
 
-func tokToString(tok Token) string{
+func tokToString(tok Token) string {
 	var str string;
 	switch tok {
-	case ILLEGAL: str = "ILLEGAL";
-	case EOF: str = "EOF";
-	case INT: str = "INT";
-	case FLOAT: str = "FLOAT";
-	case LABEL: str = "LABEL";
-	case STRING: str = "STRING";
-	case REG: str = "REG";
-	case FPREG: str = "FPREG";
-	case INSTR: str = "INSTR";
-	case DIRECTIVE: str = "DIRECTIVE";
-	case LPAREN: str = "LPAREN";
-	case RPAREN: str = "RPAREN";
+	case ILLEGAL:
+		str = "ILLEGAL"
+	case EOF:
+		str = "EOF"
+	case INT:
+		str = "INT"
+	case FLOAT:
+		str = "FLOAT"
+	case LABEL:
+		str = "LABEL"
+	case STRING:
+		str = "STRING"
+	case REG:
+		str = "REG"
+	case FPREG:
+		str = "FPREG"
+	case INSTR:
+		str = "INSTR"
+	case DIRECTIVE:
+		str = "DIRECTIVE"
+	case LPAREN:
+		str = "LPAREN"
+	case RPAREN:
+		str = "RPAREN"
 	}
 	return str;
 }
