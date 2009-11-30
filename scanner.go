@@ -45,10 +45,11 @@ func (T *TokenStream) Init() {
 
 func (T *TokenStream) Push(td *TokenData)	{ T.list.Push(td) }
 
+func (T *TokenStream) Len() int { return T.list.Len()}
+
 func (T *TokenStream) Next() *TokenData {
-	ret := T.list.At(T.curTok).(TokenData);
 	T.curTok++;
-	return &ret;
+	return T.list.At(T.curTok - 1).(*TokenData);
 }
 
 func (S *Scanner) Init(filename string, input []byte) {
@@ -138,10 +139,14 @@ restart_scan:
 	}
 
 	pos, tok = S.pos, ILLEGAL;
+	startOffset, endOffset := 0, 0;
 
 	switch c := S.c; {
 	case isLetter(c):
-		tok = S.scanIdentifier()
+		tok = S.scanIdentifier();
+		if tok == LABEL {
+			endOffset = -1; // Chop off the :
+		}
 	case isDigit(c):
 		tok = S.scanNumber()
 	default:
@@ -154,6 +159,7 @@ restart_scan:
 			S.scanString();
 		case '$':
 			tok = REG;
+			startOffset = 1; // Chop off the $
 			S.scanReg();
 		case '(':
 			tok = LPAREN
@@ -170,7 +176,7 @@ restart_scan:
 			tok = EOF;
 		}
 	}
-	return pos, tok, S.input[pos.Offset:S.pos.Offset];
+	return pos, tok, S.input[pos.Offset + startOffset:S.pos.Offset + endOffset];
 }
 
 // func Tokenize(filename string, input []byte) int {
@@ -182,7 +188,7 @@ restart_scan:
 // 	return 0;
 // }
 func Tokenize(filename string) *TokenStream {
-	var stream *TokenStream;
+	var stream TokenStream;
 	var s Scanner;
 	var t *TokenData;
 	stream.Init();
@@ -196,5 +202,5 @@ func Tokenize(filename string) *TokenStream {
 		token = tok;
 		fmt.Printf("%s@%d(%d:%d) %s %s\n", pos.Filename, pos.Offset, pos.Line, pos.Column, tokToString(token), word);
 	}
-	return stream;
+	return &stream;
 }

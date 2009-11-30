@@ -18,10 +18,10 @@ func spewTokens(filename string) {
 	}
 }
 func TestScanner(t *testing.T) {
-	l := Tokenize("tmmult.s");
-	var td TokenData;
-	for i := 0; i < l.Len(); i++ {
-		td = l.At(i).(TokenData);
+	stream := Tokenize("tmmult.s");
+	var td *TokenData;
+	for i := 0; i < stream.Len(); i++ {
+		td = stream.Next();
 		fmt.Printf("%s@%d(%d:%d) %s %s\n", td.pos.Filename, td.pos.Offset, td.pos.Line, td.pos.Column, tokToString(td.tok), td.str);
 	}
 }

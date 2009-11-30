@@ -6,7 +6,7 @@ import (
 )
 
 /* The grammar looks something like this:
-   Statement = [Label ":"] (instruction | "." directive) Arglist
+   Statement = [Label ":"] [(instruction | "." directive) Arglist]
    Arglist = Arg ["," Arglist]
    Arg = Register | Integer */
 
@@ -27,11 +27,15 @@ type Stmt struct {
 
 type StmtStream struct {
 	List *vector.Vector;
+	Cur *Stmt;
 }
 
 func (ss *StmtStream) Init()	{ ss.List = vector.New(0) }
 
-func (ss *StmtStream) Push(stmt *Stmt)	{ ss.List.Push(stmt) }
+func (ss *StmtStream) Push(stmt *Stmt)	{
+	ss.List.Push(stmt);
+	ss.Cur = stmt;
+}
 
 func Parse(filename string) {
 	var stmtStream StmtStream;
@@ -45,16 +49,41 @@ func Parse(filename string) {
 		case LAB_INST:
 			switch curTok.tok {
 			case LABEL:
-				stmtStream.Push(&Stmt{HasLabel: true, Label: curTok.str})
+				stmtStream.Push(&Stmt{HasLabel: true, Label: curTok.str});
+				state = INST;
 			case INSTR, DIRECTIVE:
-				stmtStream.Push(&Stmt{HasLabel: false, Type: curTok.tok})
+				stmtStream.Push(&Stmt{HasLabel: false, Type: curTok.tok});
+				state = ARG;
 			default:
 				fmt.Printf("Expected label, instr or directive, got %s\n",
 					tokToString(curTok.tok));
 				break;
 			}
 		case INST:
+			switch curTok.tok {
+			case LABEL:
+				stmtStream.Push(&Stmt{HasLabel: true, Label: curTok.str});
+				state = INST;
+			case INSTR, DIRECTIVE:
+				stmtStream.Cur.Type = curTok.tok;
+				state = ARG;
+			default:
+				fmt.Printf("Expected label, instr or directive, got %s\n",
+					tokToString(curTok.tok));
+				break;
+			}
 		case ARG:
+			switch curTok.tok {
+			case LABEL:
+				stmtStream.Push(&Stmt{HasLabel: true, Label: curTok.str});
+				state = INST;
+			case INSTR, DIRECTIVE:
+				stmtStream.Push(&Stmt{HasLabel: false, Type: curTok.tok});
+				state = ARG;
+			case REG:
+				//stmtStream.Cur.PushArg(&Arg{Type: REG, Value: curTok.str});
+			}
+
 		}
 	}
 

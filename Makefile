@@ -7,6 +7,7 @@ include $(GOROOT)/src/Make.$(GOARCH)
 TARG=gomps
 GOFILES=\
 	parser.go\
+	program.go\
 	token.go\
 	scanner.go\
 
