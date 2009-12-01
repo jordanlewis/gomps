@@ -1,8 +1,10 @@
-package gomps
+package parser
 
 import (
 	"container/vector";
 	"fmt";
+	"gomps/token";
+	"gomps/scanner";
 )
 
 /* The grammar looks something like this:
@@ -21,7 +23,7 @@ const (
 type Stmt struct {
 	HasLabel	bool;
 	Label		[]byte;
-	Type		Token;	// Legally either an INSTR or DIRECTIVE
+	Type		token.Token;	// Legally either an INSTR or DIRECTIVE
 	Arglist		*vector.Vector;
 }
 
@@ -40,7 +42,7 @@ func (ss *StmtStream) Push(stmt *Stmt)	{
 func Parse(filename string) {
 	var stmtStream StmtStream;
 	stmtStream.Init();
-	tokStream := Tokenize(filename);
+	tokStream := token.Tokenize(filename);
 	state := LAB_INST;
 	var curTok *TokenData;
 	for {
