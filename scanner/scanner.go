@@ -1,12 +1,13 @@
-package gomps
+package scanner
 
 import (
 	"fmt";
 	"io";
 	"container/vector";
+	"gomps/token";
 )
 
-func reportError(err string, pos Position) {
+func reportError(err string, pos token.Position) {
 	fmt.Printf("Error in scanning: %s.%s:%s): %s\n", pos.Filename,
 		pos.Line, pos.Column, err)
 }
@@ -20,8 +21,8 @@ func isDigit(char int) bool	{ return '0' <= char && char <= '9' }
 
 
 type TokenData struct {
-	pos	Position;
-	tok	Token;
+	pos	token.Position;
+	tok	token.Token;
 	str	[]byte;
 }
 
@@ -33,7 +34,7 @@ type TokenStream struct {
 type Scanner struct {
 	input	[]byte;
 
-	pos	Position;
+	pos	token.Position;
 	offset	int;
 	c	int;
 }
@@ -54,35 +55,35 @@ func (T *TokenStream) Next() *TokenData {
 
 func (S *Scanner) Init(filename string, input []byte) {
 	S.input = input;
-	S.pos = Position{filename, 0, 1, 0};
+	S.pos = token.Position{filename, 0, 1, 0};
 	S.offset = 0;
 	S.next();
 }
 
-func (S *Scanner) scanIdentifier() Token {
-	tok := INSTR;
+func (S *Scanner) scanIdentifier() token.Token {
+	tok := token.INSTR;
 	if S.c == '.' {
-		tok = DIRECTIVE
+		tok = token.DIRECTIVE
 	}
 	for isLetter(S.c) || isDigit(S.c) {
 		S.next()
 	}
 	if S.c == ':' {
 		S.next();
-		if tok == DIRECTIVE {
-			tok = ILLEGAL
+		if tok == token.DIRECTIVE {
+			tok = token.ILLEGAL
 		} else {
-			tok = LABEL
+			tok = token.LABEL
 		}
 	}
 	return tok;
 }
 
-func (S *Scanner) scanNumber() Token {
+func (S *Scanner) scanNumber() token.Token {
 	for isDigit(S.c) {
 		S.next()
 	}
-	return INT;
+	return token.INT;
 }
 
 func (S *Scanner) scanEscape() {
@@ -132,19 +133,19 @@ func (S *Scanner) next() {
 	}
 }
 
-func (S *Scanner) Scan() (pos Position, tok Token, word []byte) {
+func (S *Scanner) Scan() (pos token.Position, tok token.Token, word []byte) {
 restart_scan:
 	for S.c == ' ' || S.c == ',' || S.c == '\t' || S.c == '\n' || S.c == '\r' {
 		S.next()
 	}
 
-	pos, tok = S.pos, ILLEGAL;
+	pos, tok = S.pos, token.ILLEGAL;
 	startOffset, endOffset := 0, 0;
 
 	switch c := S.c; {
 	case isLetter(c):
 		tok = S.scanIdentifier();
-		if tok == LABEL {
+		if tok == token.LABEL {
 			endOffset = -1; // Chop off the :
 		}
 	case isDigit(c):
@@ -153,18 +154,18 @@ restart_scan:
 		S.next();
 		switch c {
 		case -1:
-			tok = EOF
+			tok = token.EOF
 		case '"':
-			tok = STRING;
+			tok = token.STRING;
 			S.scanString();
 		case '$':
-			tok = REG;
+			tok = token.REG;
 			startOffset = 1; // Chop off the $
 			S.scanReg();
 		case '(':
-			tok = LPAREN
+			tok = token.LPAREN
 		case ')':
-			tok = RPAREN
+			tok = token.RPAREN
 
 		case '#':	// Found a comment; go to next line and restart scan
 			for S.pos.Column != 0 {
@@ -173,7 +174,7 @@ restart_scan:
 			goto restart_scan;
 		default:
 			fmt.Printf("Illegal char %c\n", c);
-			tok = EOF;
+			tok = token.EOF;
 		}
 	}
 	return pos, tok, S.input[pos.Offset + startOffset:S.pos.Offset + endOffset];
@@ -194,13 +195,12 @@ func Tokenize(filename string) *TokenStream {
 	stream.Init();
 	input, _ := io.ReadFile(filename);
 	s.Init(filename, input);
-	token := ILLEGAL;
-	for token != EOF {
+	tok := token.ILLEGAL;
+	for tok != token.EOF {
 		pos, tok, word := s.Scan();
 		t = &TokenData{pos, tok, word};
 		stream.Push(t);
-		token = tok;
-		fmt.Printf("%s@%d(%d:%d) %s %s\n", pos.Filename, pos.Offset, pos.Line, pos.Column, tokToString(token), word);
+		fmt.Printf("%s@%d(%d:%d) %s %s\n", pos.Filename, pos.Offset, pos.Line, pos.Column, tok.String(), word);
 	}
 	return &stream;
 }
