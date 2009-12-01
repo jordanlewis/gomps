@@ -7,5 +7,6 @@ include $(GOROOT)/src/Make.$(GOARCH)
 TARG=gomps/scanner
 GOFILES=\
 	scanner.go\
+	errors.go
 
 include $(GOROOT)/src/Make.pkg

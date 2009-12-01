@@ -31,14 +31,6 @@ type TokenStream struct {
 	curTok	int;
 }
 
-type Scanner struct {
-	input	[]byte;
-
-	pos	token.Position;
-	offset	int;
-	c	int;
-}
-
 func (T *TokenStream) Init() {
 	T.list = vector.New(0);
 	T.curTok = 0;
@@ -53,11 +45,25 @@ func (T *TokenStream) Next() *TokenData {
 	return T.list.At(T.curTok - 1).(*TokenData);
 }
 
+type Scanner struct {
+	input	[]byte;
+	err		ErrorHandler;
+
+	pos	token.Position;
+	offset	int;
+	c	int;
+}
+
 func (S *Scanner) Init(filename string, input []byte) {
 	S.input = input;
 	S.pos = token.Position{filename, 0, 1, 0};
+	S.err.Init();
 	S.offset = 0;
 	S.next();
+}
+
+func (S *Scanner) error(pos token.Position, str string) {
+	S.err.Error(pos, str);
 }
 
 func (S *Scanner) scanIdentifier() token.Token {
@@ -91,14 +97,14 @@ func (S *Scanner) scanEscape() {
 	switch S.c {
 	case 'a', 'b', 'f', 'n', 'r', 't', 'v', '\\', '"':
 	default:
-		fmt.Printf("Illegal character escape\n")
+		S.error(S.pos, "Illegal character escape")
 	}
 }
 
 func (S *Scanner) scanString() {
 	for S.c != '"' {
 		if S.c == '\n' || S.c < 0 {
-			fmt.Printf("String unterminated\n");
+			S.error(S.pos, "String unterminated");
 			break;
 		}
 		if S.c == '\\' {
@@ -140,14 +146,10 @@ restart_scan:
 	}
 
 	pos, tok = S.pos, token.ILLEGAL;
-	startOffset, endOffset := 0, 0;
 
 	switch c := S.c; {
 	case isLetter(c):
 		tok = S.scanIdentifier();
-		if tok == token.LABEL {
-			endOffset = -1; // Chop off the :
-		}
 	case isDigit(c):
 		tok = S.scanNumber()
 	default:
@@ -160,7 +162,6 @@ restart_scan:
 			S.scanString();
 		case '$':
 			tok = token.REG;
-			startOffset = 1; // Chop off the $
 			S.scanReg();
 		case '(':
 			tok = token.LPAREN
@@ -173,21 +174,13 @@ restart_scan:
 			}
 			goto restart_scan;
 		default:
-			fmt.Printf("Illegal char %c\n", c);
+			S.error(S.pos, "Illegal character");
 			tok = token.EOF;
 		}
 	}
-	return pos, tok, S.input[pos.Offset + startOffset:S.pos.Offset + endOffset];
+	return pos, tok, S.input[pos.Offset:S.pos.Offset];
 }
 
-// func Tokenize(filename string, input []byte) int {
-// 	var s Scanner;
-// 	s.Init(filename, input);
-// 	for f(s.Scan()) {
-//
-// 	}
-// 	return 0;
-// }
 func Tokenize(filename string) *TokenStream {
 	var stream TokenStream;
 	var s Scanner;
