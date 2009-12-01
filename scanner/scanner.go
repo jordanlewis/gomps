@@ -54,10 +54,10 @@ type Scanner struct {
 	c	int;
 }
 
-func (S *Scanner) Init(filename string, input []byte) {
+func (S *Scanner) Init(filename string, input []byte, err ErrorHandler) {
 	S.input = input;
 	S.pos = token.Position{filename, 0, 1, 0};
-	S.err.Init();
+	S.err = err;
 	S.offset = 0;
 	S.next();
 }
@@ -67,6 +67,7 @@ func (S *Scanner) error(pos token.Position, str string) {
 }
 
 func (S *Scanner) scanIdentifier() token.Token {
+	pos := S.pos;
 	tok := token.INSTR;
 	if S.c == '.' {
 		tok = token.DIRECTIVE
@@ -81,6 +82,10 @@ func (S *Scanner) scanIdentifier() token.Token {
 		} else {
 			tok = token.LABEL
 		}
+	}
+	if tok == token.DIRECTIVE {
+		dirStr := fmt.Sprintf("%s", S.input[pos.Offset:S.pos.Offset]);
+		if t, ok := token.Directives[dirStr]; ok { tok = t }
 	}
 	return tok;
 }
@@ -167,6 +172,8 @@ restart_scan:
 			tok = token.LPAREN
 		case ')':
 			tok = token.RPAREN
+		case ',':
+			tok = token.COMMA
 
 		case '#':	// Found a comment; go to next line and restart scan
 			for S.pos.Column != 0 {
@@ -185,12 +192,15 @@ func Tokenize(filename string) *TokenStream {
 	var stream TokenStream;
 	var s Scanner;
 	var t *TokenData;
+	var e ErrorList;
+	e.Init();
 	stream.Init();
 	input, _ := io.ReadFile(filename);
-	s.Init(filename, input);
+	s.Init(filename, input, &e);
 	tok := token.ILLEGAL;
 	for tok != token.EOF {
-		pos, tok, word := s.Scan();
+		pos, tokn, word := s.Scan();
+		tok = tokn;
 		t = &TokenData{pos, tok, word};
 		stream.Push(t);
 		fmt.Printf("%s@%d(%d:%d) %s %s\n", pos.Filename, pos.Offset, pos.Line, pos.Column, tok.String(), word);

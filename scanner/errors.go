@@ -6,7 +6,11 @@ import (
 	"gomps/token";
 )
 
-type ErrorHandler struct {
+type ErrorHandler interface {
+	Error(pos token.Position, str string);
+}
+
+type ErrorList struct {
 	errors vector.Vector;
 }
 
@@ -15,10 +19,12 @@ type Error struct {
 	Str string;
 }
 
-func (h *ErrorHandler) Init()	{ h.errors.Init(0) }
+func (h *ErrorList) Init()	{ h.errors.Init(0) }
 
-func (h *ErrorHandler) Error(pos token.Position, str string) {
-	h.errors.Push(&Error{pos, str})
+func (h *ErrorList) Error(pos token.Position, str string) {
+	h.errors.Push(&Error{pos, str});
+	fmt.Printf("%s\n", h.errors.Last());
+
 }
 
 func (e *Error) String() string {

@@ -1,7 +1,17 @@
 package instr
 
+type Instr string
+type Directive string
+type ArgType int
+
+func (I Instr) Type() ArgType {
+	typ, _ := instrToType[I]; // typ will be set to 0 (INVALID) if I isn't found
+	return typ;
+}
+
 const ( // R = register, I = immed, A = address, L = label
-	RRR = iota;
+	INVALID = iota;
+	RRR;
 	RRI;
 	RRO;
 	ROR;
@@ -17,7 +27,7 @@ const ( // R = register, I = immed, A = address, L = label
 	NONE;
 )
 
-var InstrType = map[string] int {
+var instrToType = map[Instr] ArgType {
 /* arith */
 	"add":		RRR,
 	"addi":		RRI,

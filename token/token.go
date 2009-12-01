@@ -17,10 +17,19 @@ const (
 	REG;		// $r3
 	FPREG;		// $f3
 	INSTR;		// abs.d
-	DIRECTIVE;	//.align
+	DIRECTIVE;	// one of the below .directives
+
+	D_ALIGN;
+	D_ASCIIZ;
+	D_BYTE;
+	D_DATA;
+	D_SPACE;
+	D_TEXT;
+	D_WORD;
 
 	LPAREN;
 	RPAREN;
+	COMMA;
 )
 
 var tokens = map[Token] string {
@@ -33,13 +42,32 @@ var tokens = map[Token] string {
 
 	LABEL: "LABEL",
 	INSTR: "INSTR",
-	DIRECTIVE: "DIRECTIVE",
 	REG: "REG",
 	FPREG: "FPREG",
+
+	DIRECTIVE: "DIRECTIVE",
+	D_ALIGN: ".ALIGN",
+	D_ASCIIZ: ".ASCIIZ",
+	D_BYTE: ".BYTE",
+	D_DATA: ".DATA",
+	D_SPACE: ".SPACE",
+	D_TEXT: ".TEXT",
+	D_WORD: ".WORD",
 
 	LPAREN: "(",
 	RPAREN: ")"
 }
+
+var Directives = map[string] Token {
+	".align": D_ALIGN,
+	".asciiz": D_ASCIIZ,
+	".byte": D_BYTE,
+	".data": D_DATA,
+	".space": D_SPACE,
+	".text": D_TEXT,
+	".word": D_WORD,
+}
+
 
 
 func (tok Token) String() string {
