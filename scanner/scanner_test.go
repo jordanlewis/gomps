@@ -18,7 +18,7 @@ func spewTokens(filename string) {
 	}
 }
 func TestScanner(t *testing.T) {
-	stream := Tokenize("tmmult.s");
+	stream := Tokenize("../tmmult.s");
 	var td *TokenData;
 	for i := 0; i < stream.Len(); i++ {
 		td = stream.Next();
