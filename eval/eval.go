@@ -5,17 +5,18 @@ import (
 	"gomps/debug";
 	"gomps/inst";
 	"fmt";
+	"container/vector";
 )
 
 
 type CPU struct {
-	sp uint32;
-	fp uint32;
-	gp uint32;
+	cycles int;
 	Regs [32]uint32;
 	pc uint32;
-	Instrs [1024]*inst.Inst;
-	pipeline *Pipeline;
+	Instlabs map[string] int;
+	Datalabs map[string] int;
+	Instrs *vector.Vector;
+	Pipeline *Pipeline;
 	mem [1024]uint32;
 	alu_res uint32;
 	mem_res uint32;
@@ -68,6 +69,7 @@ func (e *exmem_buf) String() string {
 }
 
 type memwb_buf struct { /* Buffer between memory access and writeback */
+	was_full bool; /* just for printing functions */
 	full bool;
 	lmd uint32;
 	alu_out uint32;
@@ -102,60 +104,65 @@ func (p *Pipeline) Step() {
 
 	/* writeback:  */
 	if p.memwb.full {
-		debug.Debug("Writeback: ");
+		p.memwb.was_full = true;
+		debug.Debug("WRITE: ");
 		switch inst.IType[p.memwb.inst.Opname] {
 		case inst.ARITH:
 			switch p.memwb.inst.Opname {
 			case t.ADD, t.ADDU, t.AND, t.NOR, t.OR, t.SUB, t.SUBU, t.XOR:
 				p.cpu.Regs[p.memwb.inst.RD] = p.memwb.alu_out;
-				debug.Debug("Reg[%d] = ALU_OUT (%d)\n", p.memwb.inst.RT,p.memwb.alu_out)
+				debug.Debug("Reg[%d] <- ALU_OUT (%d): ", p.memwb.inst.RD,p.memwb.alu_out)
 			case t.ADDI, t.ANDI, t.ORI, t.XORI:
 				p.cpu.Regs[p.memwb.inst.RT] = p.memwb.alu_out;
-				debug.Debug("Reg[%d] = ALU_OUT (%d)\n", p.memwb.inst.RT,p.memwb.alu_out)
+				debug.Debug("Reg[%d] <- ALU_OUT (%d): ", p.memwb.inst.RT,p.memwb.alu_out)
 			}
 		case inst.LOSTO:
 			switch p.memwb.inst.Opname {
-			case t.LB, t.LBU, t.LH, t.LHU, t.LUI, t.LW:
+			case t.LB, t.LH, t.LW:
 				p.cpu.Regs[p.memwb.inst.RT] = p.memwb.lmd;
-				debug.Debug("Reg[%d] = LMD (%d)\n", p.memwb.inst.RT,p.memwb.lmd)
-			default:
-				debug.Debug("got a store, doing nothing.\n");
+				debug.Debug("Reg[%d] <- LMD (%d): ",p.memwb.inst.RT,p.memwb.lmd)
+			case t.SB, t.SH, t.SW:
+				debug.Debug("got a store, doing nothing: ");
 			}
 		case inst.BRANCH:
-			debug.Debug("got a branch, doing nothing\n");
+			debug.Debug("got a branch, doing nothing: ");
 		}
+		debug.Debug("%s\n", p.memwb.String());
 		p.memwb.full = false;
 	}
 
 	/* memory access */
 	if p.exmem.full {
-		debug.Debug("Memory access: ");
+		debug.Debug("MEM: ");
 		switch inst.IType[p.exmem.inst.Opname] {
 		case inst.ARITH:
 			p.memwb.inst = p.exmem.inst;
 			p.memwb.alu_out = p.exmem.alu_out;
-			debug.Debug("ARITH inst: passing along inst and alu out\n");
+			debug.Debug("ARITH inst: forwarding inst, alu out: ");
 			p.memwb.full = true;
 		case inst.LOSTO:
 			p.memwb.inst = p.exmem.inst;
 			switch p.exmem.inst.Opname {
 			case t.LB, t.LH, t.LW:
 				p.memwb.lmd = p.cpu.mem[p.exmem.alu_out];
-				debug.Debug("LOAD inst: setting LMD to mem[alu_out]\n");
+				debug.Debug("LOAD inst: LMD <- mem[alu_out]: ");
 			case t.SB, t.SH, t.SW:
 				p.cpu.mem[p.exmem.alu_out] = p.exmem.reg_b;
-				debug.Debug("STOR inst: setting mem[alu_out] to reg_b\n");
+				debug.Debug("STOR inst: mem[alu_out] <- reg_b: ");
+			case t.LA:
+				p.memwb.lmd = uint32(p.ifid.inst.TGT);
 			}
 			p.memwb.full = true;
 		case inst.BRANCH:
-			debug.Debug("BRANCH inst: ending instruction\n");
+			debug.Debug("BRANCH inst: ending instruction: ");
 		}
+		debug.Debug("%s\n", p.memwb.String());
 		p.exmem.full = false;
 	}
 
 	/* exec */
 	if p.idex.full {
-		debug.Debug("Execute: ");
+		debug.Debug("EXEC: ");
 		switch inst.IType[p.idex.inst.Opname] {
 		case inst.ARITH:
 			p.exmem.inst = p.idex.inst;
@@ -175,12 +182,12 @@ func (p *Pipeline) Step() {
 
 	/* decode */
 	if p.ifid.full {
-		debug.Debug("Decode: ");
+		debug.Debug("DECODE: ");
 		p.idex.reg_a = p.cpu.Regs[p.ifid.inst.RS];
 		p.idex.reg_b = p.cpu.Regs[p.ifid.inst.RT];
 		p.idex.npc = p.ifid.npc;
 		p.idex.inst = p.ifid.inst;
-		p.idex.imm = p.ifid.inst.IMM; /* Sign extend? */
+		p.idex.imm = uint32(p.ifid.inst.IMM); /* Sign extend? */
 		debug.Debug("%s\n", p.idex.String());
 
 		p.idex.full = true;
@@ -192,31 +199,79 @@ func (p *Pipeline) Step() {
 	   instead its just an array of pointers to instruction structs. So the
 	   program counter is just incremented, not += 4. */
 	if p.ready {
-		debug.Debug("fetch: ");
+		debug.Debug("IFETCH: ");
 		p.ifid.inst = p.cpu.get_inst_at_pc();
-		if p.exmem.full &&
-		   inst.IType[p.exmem.inst.Opname] == inst.BRANCH && p.exmem.cond {
-			debug.Debug("foo\n");
-			p.ifid.npc = p.exmem.alu_out;
+		debug.Debug("%s\n", p.ifid.inst.String());
+		var branch bool;
+		if inst.IType[p.ifid.inst.Opname] == inst.BRANCH {
+			op := p.ifid.inst;
+			switch op.Opname {
+			case t.BEQ:    branch = p.cpu.Regs[op.RT] == p.cpu.Regs[op.RS];
+			case t.BGEZ:   branch = p.cpu.Regs[op.RS] >= 0;
+			//case t.BGEZAL: branch = 
+			case t.BGTZ:   branch = p.cpu.Regs[op.RS] > 0;
+			case t.BLEZ:   branch = p.cpu.Regs[op.RS] <= 0;
+			case t.BLT:    branch = p.cpu.Regs[op.RS] < p.cpu.Regs[op.RT];
+			case t.BLTZ:   branch = p.cpu.Regs[op.RS] < 0;
+			//case t.BLTZAL:
+			case t.BNE:    branch = p.cpu.Regs[op.RT] != p.cpu.Regs[op.RS];
+			case t.BNEZ:   branch = p.cpu.Regs[op.RS] != 0;
+			}
+		}
+		if branch {
+			p.ifid.npc = uint32(p.ifid.inst.TGT);
 		} else {
 			p.ifid.npc = p.cpu.pc + 1;
 		}
 		p.cpu.pc = p.ifid.npc;
-		debug.Debug("%s\n", p.ifid.String());
+		//debug.Debug("%s\n", p.ifid.String());
 
 		p.ifid.full = true;
 		p.ready = false;
 	}
-	/* Skip argument fetching thing for now */
+
+	if p.cpu.cycles % 20 == 0 {
+		debug.PPrint("\tIFETCH\tDECODE\tEXEC\tMEM\tWB\n");
+	}
+
+	p.cpu.cycles += 1;
+
+	debug.PPrint("%d:", p.cpu.cycles);
+	if p.ifid.full { debug.PPrint("\t%s\t", p.ifid.inst.Opname.String()) }
+	else { debug.PPrint ("\t\t") }
+	if p.idex.full { debug.PPrint("%s\t", p.idex.inst.Opname.String()) }
+	else { debug.PPrint ("\t") }
+	if p.exmem.full { debug.PPrint("%s\t", p.exmem.inst.Opname.String()) }
+	else { debug.PPrint ("\t") }
+	if p.memwb.full { debug.PPrint("%s\t", p.memwb.inst.Opname.String()) }
+	else { debug.PPrint ("\t") }
+	if p.memwb.was_full { debug.PPrint("%s => alu:%d lmd:%d\t",
+									   p.memwb.inst.Opname.String(),
+									   p.memwb.alu_out, p.memwb.lmd) }
+	else { debug.PPrint ("\t") }
+	p.memwb.was_full = false;
+	debug.PPrint("\n");
 }
 
 func (c *CPU) Init() {
 	c.pc = 0;
-	c.pipeline = &Pipeline{c, false, ifid_buf{}, idex_buf{}, exmem_buf{}, memwb_buf{}}
+	c.cycles = 0;
+	c.Pipeline = &Pipeline{c, false, ifid_buf{}, idex_buf{}, exmem_buf{}, memwb_buf{}}
+}
+
+func (c *CPU) Execute() {
+	for c.pc < uint32(c.Instrs.Len()){
+		c.Pipeline.Dispatch();
+		c.Pipeline.Step();
+		c.Pipeline.Step();
+		c.Pipeline.Step();
+		c.Pipeline.Step();
+		c.Pipeline.Step();
+	}
 }
 
 func (c *CPU)get_inst_at_pc() *inst.Inst {
-	return c.Instrs[c.pc];
+	return c.Instrs.At(int(c.pc)).(*inst.Inst);
 }
 
 func do_arith(idex *idex_buf) (ret uint32) {
@@ -255,65 +310,3 @@ func do_arith(idex *idex_buf) (ret uint32) {
 	return;
 }
 
-//func (c *CPU) Step() {
-//	var tmp *ast.Inst;
-//	var tmp2 *ast.Inst;
-//
-//	debug.Debug("--------- PC = %d ---------\n", c.pc);
-//	debug.Debug("IFETCH\tDECODE\tEXECUTE\tMEMORY\tWRITEBACK\n");
-//
-//	tmp2 = c.pipeline[1];
-//	c.pipeline[1] = tmp;
-//	tmp = tmp2;
-//
-//	c.pc += 1;
-//
-//	debug.Debug("DECODE: pc = %d, args = ...\n", c.pc);
-//
-//	/* Execute */
-//	if c.pipeline[1] == nil {
-//		debug.Debug("Omg\n");
-//	}
-//	switch c.pipeline[1].Opcode {
-//	case t.ADD:
-//		c.alu_res = c.Regs[c.pipeline[1].Reg2] + c.Regs[c.pipeline[1].Reg3];
-//	//t.ADD;
-//	//t.ADDI;
-//	//t.ADDIU;
-//
-//	}
-//	debug.Debug("EXEC(%s) = %d\n", c.pipeline[1].Opcode.String(), c.alu_res);
-//
-//	/* Mem access */
-//	tmp2 = c.pipeline[2];
-//	c.pipeline[2] = tmp;
-//	tmp = tmp2;
-//	switch c.pipeline[2].Opcode {
-//	case t.LB,t.LBU,t.LH,t.LHU,t.LW,t.LWL,t.LWR:
-//		c.mem_res = c.mem[c.pipeline[1].Reg2 + c.Regs[c.pipeline[1].Reg3]];
-//		debug.Debug("MEM: load = %d\n", c.mem_res);
-//	case t.SB,t.SH,t.SW,t.SWL,t.SWR,t.ULW,t.USW:
-//		c.mem[c.pipeline[1].Reg2 + c.Regs[c.pipeline[1].Reg3]] =
-//			c.Regs[c.pipeline[1].Reg1];
-//		debug.Debug("MEM: store\n");
-//	default:
-//		c.mem_res = c.alu_res;
-//		debug.Debug("MEM: pass (%d)\n", c.mem_res);
-//	}
-//
-//	/* Writeback */
-//	tmp2 = c.pipeline[3];
-//	c.pipeline[3] = tmp;
-//	tmp = tmp2;
-//
-//	switch c.pipeline[3].Opcode {
-//	case t.SB,t.SH,t.SW,t.SWL,t.SWR,t.ULW,t.USW:
-//		/* writeback does nothing with stores */
-//		debug.Debug("WB: Doing nothing due to a store\n");
-//	default:
-//		c.Regs[c.pipeline[3].Reg1] = c.mem_res;
-//		debug.Debug("WB: Reg %d <--- %d\n", c.pipeline[3].Reg1, c.mem_res)
-//	}
-//	return;
-//
-//}

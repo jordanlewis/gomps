@@ -5,7 +5,7 @@ import (
 )
 
 
-func TestScanner(t *testing.T) {
+func TestParser(t *testing.T) {
 	Parse("../tmmult.s");
 }
 

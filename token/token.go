@@ -40,8 +40,6 @@ const (
 	ADDI;
 	ADDIU;
 	ADDU;
-	LA;
-	LI;
 	LUI;
 	SUB;
 	SUBU;
@@ -74,13 +72,12 @@ const (
 	MTLO;
 
 /* jumps and branches */
-	B;
-	BAL;
 	BEQ;
 	BGEZ;
 	BGEZAL;
 	BGTZ;
 	BLEZ;
+	BLT;
 	BLTZ;
 	BLTZAL;
 	BNE;
@@ -91,20 +88,13 @@ const (
 	JR;
 
 /* load and store */
+	LA;
 	LB;
-	LBU;
 	LH;
-	LHU;
 	LW;
-	LWL;
-	LWR;
 	SB;
 	SH;
 	SW;
-	SWL;
-	SWR;
-	ULW;
-	USW;
 	keyword_end;
 )
 
@@ -138,8 +128,6 @@ var tokens = map[Token] string {
 	ADDI:	"addi",
 	ADDIU:	"addiu",
 	ADDU:	"addu",
-	LA:		"la",
-	LI:		"li",
 	LUI:	"lui",
 	SUB:	"sub",
 	SUBU:	"subu",
@@ -172,13 +160,12 @@ var tokens = map[Token] string {
 	MTLO:	"mtlo",
 
 /* Jumps and branches */
-	B:		"b",
-	BAL:	"bal",
 	BEQ:	"beq",
 	BGEZ:	"bgez",
 	BGEZAL:	"bgezal",
 	BGTZ:	"bgtz",
 	BLEZ:	"blez",
+	BLT:	"blt",
 	BLTZ:	"bltz",
 	BLTZAL:	"bltzal",
 	BNE:	"bne",
@@ -189,6 +176,7 @@ var tokens = map[Token] string {
 	JR:		"jr",
 
 /* Load and Store */
+	LA:		"la",
 	LB:		"lb",
 	LH:		"lh",
 	LW:		"lw",

@@ -2,7 +2,7 @@
 # Matrix multiplication assignment
 
     .data
-    .align  2
+    .align 2
 
 nl: .asciiz "\n"
 sp: .asciiz " "
@@ -14,15 +14,15 @@ m3: .word 0,0,0,0,0,0,0,0,0
 
 main:
     # Constants
-    li $t3,3 # sizeof col
-    li $t4,4 # sizeof word
+    ori $t3,$zero,3 # sizeof col
+    ori $t4,$zero,4 # sizeof word
 
     # Initialize loop variables
-    li  $t0,0 # i
+    ori  $t0,$zero,0 # i
 ILOOP:
-    li  $t1,0 # j
+    ori  $t1,$zero,0 # j
 JLOOP:
-    li  $t2,0 # k
+    ori  $t2,$zero,0 # k
 KLOOP:
     # Want to implement following calculation
     # m3[i][j] += m1[i][k] * m2[k][j]
@@ -35,7 +35,7 @@ KLOOP:
     mult $t6,$t4    # (i * 3) + k) * 4
     mflo $t6        # (i * 3) + k) * 4
     add $t6,$t6,$t5 # t6 = m1 + ((i * 3) + k) * 4)
-    lw $t7,($t6)    # t7 = m1[i][k]
+    lw $t7,0($t6)    # t7 = m1[i][k]
 
     # Calculate m2 offset, store m2[k][j] in t8
     la $t5,m2
@@ -45,7 +45,7 @@ KLOOP:
     mult $t6,$t4    # (k * 3) + j) * 4
     mflo $t6        # (k * 3) + j) * 4
     add $t6,$t6,$t5 # t6 = m2 + ((k * 3) + j) * 4)
-    lw $t8,($t6)    # t8 = m2[k][j]
+    lw $t8,0($t6)    # t8 = m2[k][j]
 
     # Calculate m1[i][k] * m2[k][j], put it in t7
     mult $t7,$t8
@@ -63,11 +63,11 @@ KLOOP:
 
 
     # Add m3[i][j] to m1[i][k] * m2[k][j], put it in t9
-    lw $t8,($t6)     # t8 = m3[i][j]
+    lw $t8,0($t6)     # t8 = m3[i][j]
     add $t9,$t7,$t8
 
     # Put the result of the above back into m3[i][j]
-    sw $t9,($t6)
+    sw $t9,0($t6)
 
 
     # Done with calculation, now deal with jumps
@@ -84,9 +84,9 @@ KLOOP:
     la  $t2,m3 # grab address of m3
     # 3 is in t3, 4 is in t4 still
 
-    li  $t0,0 # i
+    ori  $t0,$zero,0 # i
 PILOOP:
-    li  $t1,0 # j
+    ori  $t1,$zero,0 # j
 PJLOOP:
     # Calculate offset of m3[i][j]
     mult $t0,$t3    # i * 3
@@ -97,10 +97,10 @@ PJLOOP:
     add $t5,$t5,$t2 # t5 = m3 + ((i * 3) + j) * 4)
 
     # Print m3[i][j] and a space
-    li   $v0,1
-    lw   $a0,($t5)  # a0 = m3[i][j]
+    ori   $v0,$zero,1
+    lw   $a0,0($t5)  # a0 = m3[i][j]
     syscall
-    li   $v0,4
+    ori   $v0,$zero,4
     la   $a0,sp
     syscall
 
@@ -116,5 +116,5 @@ PJLOOP:
     blt  $t0,$t3,PILOOP   # go to iloop if i < 3
 
     # finished: exit
-    li   $v0,10
+    ori   $v0,$zero,10
     syscall

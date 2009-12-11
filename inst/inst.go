@@ -12,17 +12,6 @@ type RegT uint8;
 type LabelT uint16;
 type ImmT uint32;
 
-/*
-type Inst interface {
-	getOpname() token.Token;
-	getRS();
-	getRT();
-	getRD();
-	getSA();
-	getIMM();
-	getTGT();
-}
-*/
 
 type Inst struct {
 	Opname token.Token;
@@ -30,7 +19,7 @@ type Inst struct {
 	RT RegT;
 	RD RegT;
 	SA uint8;
-	IMM uint32;
+	IMM int;
 	TGT LabelT;
 }
 
@@ -38,50 +27,39 @@ func (i *Inst) String() string {
 	return fmt.Sprintf("inst(%s: %d %d %d %d %d %d)", i.Opname.String(), i.RS, i.RT, i.RD, i.SA, i.IMM, i.TGT);
 }
 
-type RInst struct {
-	Opname token.Token;
-	RS RegT;
-	RT RegT;
-	RD RegT;
-	SA uint8;
+var regnum = map[string] RegT {
+	"$zero": 0,
+	"$at":1,
+	"$v0":2, "$v1":3,
+	"$a0":4, "$a1":5, "$a2":6, "$a3":7,
+	"$t0":8, "$t1":9, "$t2":10, "$t3":11, "$t4":12, "$t5":13, "$t6":14,"$t7":15,
+	"$s0":16,"$s1":17,"$s2":18, "$s3":19, "$s4":20, "$s5":21, "$s6":22,"$s7":23,
+	"$t8":24, "$t9":25,
+	"$k0":26, "$k1":27,
+	"$gp":28, "$sp":29, "$fp":30, "$ra":31
 }
 
-type IInst struct {
-	Opname token.Token;
-	RS RegT;
-	RT RegT;
-	IMM ImmT;
+func Regnum(str []byte) RegT {
+	return regnum[string(str)];
 }
-
-type JInst struct {
-	Opname token.Token;
-	TGT LabelT;
-}
-
-func (x *RInst) getOpname() token.Token	{return x.Opname}
-func (x *IInst) isInst()	{}
-func (x *JInst) isInst()	{}
-
 
 const ( // R = register, I = immed, A = address, L = label, S = string
 	INVALID = iota;
+
+	//r_types
 	RRR;
-	RRI;
-	RRO;
-	ROR;
-	RRL;
-	RIL;
 	RR;
-	RI;
-	RA;
-	RL;
 	R;
-	A;
+	RRI;
+
+	//i_types
+	RRL;
+	RL;
+	RIR;
+	RI;
+
+	//j_types
 	L;
-	S;
-	M;
-	I;
-	NONE;
 )
 
 const (
@@ -95,8 +73,6 @@ var IType = map[token.Token] InstType {
 	token.ADDI: ARITH,
 	token.ADDIU: ARITH,
 	token.ADDU: ARITH,
-	token.LA: ARITH,
-	token.LI: ARITH,
 	token.LUI: ARITH,
 	token.SUB: ARITH,
 	token.SUBU: ARITH,
@@ -129,13 +105,12 @@ var IType = map[token.Token] InstType {
 	token.MTLO: ARITH,
 
 /* Jumps and branches */
-	token.B: BRANCH,
-	token.BAL: BRANCH,
 	token.BEQ: BRANCH,
 	token.BGEZ: BRANCH,
 	token.BGEZAL: BRANCH,
 	token.BGTZ: BRANCH,
 	token.BLEZ: BRANCH,
+	token.BLT: BRANCH,
 	token.BLTZ: BRANCH,
 	token.BLTZAL: BRANCH,
 	token.BNE: BRANCH,
@@ -146,6 +121,7 @@ var IType = map[token.Token] InstType {
 	token.JR: BRANCH,
 
 /* Load and Store */
+	token.LA: LOSTO,
 	token.LB: LOSTO,
 	token.LH: LOSTO,
 	token.LW: LOSTO,
@@ -154,37 +130,35 @@ var IType = map[token.Token] InstType {
 	token.SW: LOSTO,
 }
 
-var Instrs = map[token.Token] ArgType {
-	token.D_ALIGN:	I,
-	token.D_ASCIIZ:	S,
-	token.D_BYTE:	M,
-	token.D_DATA:	M,
-	token.D_SPACE:	I,
-	token.D_TEXT:	M,
-	token.D_WORD:	M,
+var AType = map[token.Token] ArgType {
+	//token.D_ALIGN:	I,
+	//token.D_ASCIIZ:	S,
+	//token.D_BYTE:	M,
+	//token.D_DATA:	M,
+	//token.D_SPACE:	I,
+	//token.D_TEXT:	M,
+	//token.D_WORD:	M,
 
-/* atoken.rith */
+/* arith */
 	token.ADD:		RRR,
 	token.ADDI:		RRI,
 	token.ADDIU:	RI,
 	token.ADDU:		RRR,
-	token.LA:		RL,
-	token.LI:		RI,
 	token.LUI:		RI,
 	token.SUB:		RRR,
 	token.SUBU:		RRR,
 
-/* ltoken.ogical */
+/* logical */
 	token.AND:		RRR,
 	token.ANDI:		RRI,
-	token.NOP:		NONE,
+	//token.NOP:		NONE,
 	token.NOR:		RRR,
 	token.OR:		RRR,
 	token.ORI:		RRI,
 	token.XOR:		RRR,
 	token.XORI:		RRI,
 
-/* mtoken.ul and div */
+/* mul and div */
 	token.DIV:		RR,
 	token.DIVU:		RR,
 	token.MADD:		RR,
@@ -195,34 +169,34 @@ var Instrs = map[token.Token] ArgType {
 	token.MULT:		RR,
 	token.MULTU:	RR,
 
-/* atoken.ccumulators */
+/* accumulators */
 	token.MFHI:		R,
 	token.MFLO:		R,
 	token.MTHI:		R,
 	token.MTLO:		R,
 
-/* jtoken.umps and branches */
-	token.B:		L,
-	token.BAL:		L,
+/* jumps and branches */
 	token.BEQ:		RRL,
 	token.BGEZ:		RL,
 	token.BGEZAL:	RL,
 	token.BGTZ:		RL,
 	token.BLEZ:		RL,
+	token.BLT:		RRL,
 	token.BLTZ:		RL,
 	token.BLTZAL:	RL,
 	token.BNE:		RRL,
 	token.BNEZ:		RL,
-	token.J:		A,
-	token.JAL:		A,
+	token.J:		L,
+	token.JAL:		L,
 	token.JALR:		RR,
 	token.JR:		R,
 
-/* ltoken.oad and store */
-	token.LB:		RA,
-	token.LH:		RA,
-	token.LW:		RA,
-	token.SB:		RA,
-	token.SH:		RA,
-	token.SW:		RA,
+/* load and store */
+	token.LA:		RL,
+	token.LB:		RIR,
+	token.LH:		RIR,
+	token.LW:		RIR,
+	token.SB:		RIR,
+	token.SH:		RIR,
+	token.SW:		RIR,
 }

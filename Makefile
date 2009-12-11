@@ -9,9 +9,12 @@
 #	program.go\
 #
 #include $(GOROOT)/src/Make.pkg
-TARGETS = debug inst token scanner ast parser eval
+TARGETS = debug inst token scanner parser eval
 all:
 	for d in $(TARGETS); do (cd $$d; $(MAKE) && $(MAKE) install); done
+	6g gomps.go && 6l -o gomps gomps.6
+
 
 clean:
 	for d in $(TARGETS); do (cd $$d; $(MAKE) clean); done
+	rm gomps.6 gomps
