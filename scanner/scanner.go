@@ -2,8 +2,6 @@ package scanner
 
 import (
 	"fmt";
-	"io";
-	"container/vector";
 	"gomps/token";
 )
 
@@ -18,32 +16,6 @@ func isLetter(char int) bool {
 }
 
 func isDigit(char int) bool	{ return '0' <= char && char <= '9' }
-
-
-type TokenData struct {
-	pos	token.Position;
-	tok	token.Token;
-	str	[]byte;
-}
-
-type TokenStream struct {
-	list	*vector.Vector;
-	curTok	int;
-}
-
-func (T *TokenStream) Init() {
-	T.list = vector.New(0);
-	T.curTok = 0;
-}
-
-func (T *TokenStream) Push(td *TokenData)	{ T.list.Push(td) }
-
-func (T *TokenStream) Len() int { return T.list.Len()}
-
-func (T *TokenStream) Next() *TokenData {
-	T.curTok++;
-	return T.list.At(T.curTok - 1).(*TokenData);
-}
 
 type Scanner struct {
 	input	[]byte;
@@ -68,26 +40,15 @@ func (S *Scanner) error(pos token.Position, str string) {
 
 func (S *Scanner) scanIdentifier() token.Token {
 	pos := S.pos;
-	tok := token.INSTR;
-	if S.c == '.' {
-		tok = token.DIRECTIVE
-	}
 	for isLetter(S.c) || isDigit(S.c) {
 		S.next()
 	}
 	if S.c == ':' {
 		S.next();
-		if tok == token.DIRECTIVE {
-			tok = token.ILLEGAL
-		} else {
-			tok = token.LABEL
-		}
+		return token.LABEL;
 	}
-	if tok == token.DIRECTIVE {
-		dirStr := fmt.Sprintf("%s", S.input[pos.Offset:S.pos.Offset]);
-		if t, ok := token.Directives[dirStr]; ok { tok = t }
-	}
-	return tok;
+
+	return token.Lookup(S.input[pos.Offset:S.pos.Offset]);
 }
 
 func (S *Scanner) scanNumber() token.Token {
@@ -146,7 +107,7 @@ func (S *Scanner) next() {
 
 func (S *Scanner) Scan() (pos token.Position, tok token.Token, word []byte) {
 restart_scan:
-	for S.c == ' ' || S.c == ',' || S.c == '\t' || S.c == '\n' || S.c == '\r' {
+	for S.c == ' ' || S.c == '\t' || S.c == '\n' || S.c == '\r' {
 		S.next()
 	}
 
@@ -186,24 +147,4 @@ restart_scan:
 		}
 	}
 	return pos, tok, S.input[pos.Offset:S.pos.Offset];
-}
-
-func Tokenize(filename string) *TokenStream {
-	var stream TokenStream;
-	var s Scanner;
-	var t *TokenData;
-	var e ErrorList;
-	e.Init();
-	stream.Init();
-	input, _ := io.ReadFile(filename);
-	s.Init(filename, input, &e);
-	tok := token.ILLEGAL;
-	for tok != token.EOF {
-		pos, tokn, word := s.Scan();
-		tok = tokn;
-		t = &TokenData{pos, tok, word};
-		stream.Push(t);
-		fmt.Printf("%s@%d(%d:%d) %s %s\n", pos.Filename, pos.Offset, pos.Line, pos.Column, tok.String(), word);
-	}
-	return &stream;
 }

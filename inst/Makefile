@@ -4,8 +4,8 @@
 
 include $(GOROOT)/src/Make.$(GOARCH)
 
-TARG=gomps/instr
+TARG=gomps/inst
 GOFILES=\
-	instr.go\
+	inst.go
 
 include $(GOROOT)/src/Make.pkg

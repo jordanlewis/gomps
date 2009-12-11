@@ -2,8 +2,35 @@ package ast
 
 import (
 	"gomps/token";
-	"gomps/instr";
 )
+
+/*
+Prog := (Exp)*
+
+Exp := Opname Arglist
+
+Arglist :=
+		 | Arg ("," Arg)*
+		 | Arg "," Arg "(" Arg ")"
+
+Arg := Reg
+	 | Immed
+	 | Label
+
+*/
+
+
+type MIPSInst interface {
+	
+}
+type Inst struct {
+	Opcode token.Token;
+	Label string;
+	Reg1 uint32;
+	Reg2 uint32;
+	Reg3 uint32;
+}
+
 
 type Lit struct {
 	Kind token.Token; // INT, FLOAT, or STRING
@@ -50,7 +77,7 @@ type (
 		Decl Decl;
 	};
 	Instr struct {
-		Instr instr.Instr;
+		Instr token.Token;
 		Args []Arg;
 	};
 	DataDecl struct {

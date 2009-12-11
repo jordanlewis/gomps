@@ -9,7 +9,7 @@
 #	program.go\
 #
 #include $(GOROOT)/src/Make.pkg
-TARGETS = instr token scanner ast parser
+TARGETS = debug inst token scanner ast parser eval
 all:
 	for d in $(TARGETS); do (cd $$d; $(MAKE) && $(MAKE) install); done
 
