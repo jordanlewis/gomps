@@ -4,8 +4,6 @@
     .data
     .align 2
 
-#nl: .asciiz "\n"
-#sp: .asciiz " "
 
 m1: .word 1,2,3,4,5,6,7,8,9
 m2: .word 11,12,13,14,15,16,17,18,19
@@ -79,44 +77,3 @@ KLOOP:
     addi $t0,$t0,1 # i++
     blt  $t0,$t3,ILOOP   # go to iloop if i < 3
 
-
-
-    # Print Loop
-#    la  $t2,m3 # grab address of m3
-#    # 3 is in t3, 4 is in t4 still
-#
-#    ori  $t0,$zero,0 # i
-#PILOOP:
-#    ori  $t1,$zero,0 # j
-#PJLOOP:
-#    # Calculate offset of m3[i][j]
-#    mult $t0,$t3    # i * 3
-#    mflo $t5        # i * 3
-#    add $t5,$t5,$t1 # (i * 3) + j
-#    mult $t5,$t4    # (i * 3) + j) * 4
-#    mflo $t5        # (i * 3) + j) * 4
-#    add $t5,$t5,$t2 # t5 = m3 + ((i * 3) + j) * 4)
-#
-#    # Print m3[i][j] and a space
-#    #ori   $v0,$zero,1
-#    #lw   $a0,0($t5)  # a0 = m3[i][j]
-#    #syscall
-#    #ori   $v0,$zero,4
-#    #la   $a0,sp
-#    #syscall
-#
-#    # loop branching logic
-#    addi $t1,$t1,1 # j++
-#    blt  $t1,$t3,PJLOOP   # go to jloop if j < 3
-#
-#    # If we're changing rows, print a newline too
-#    #la   $a0,nl
-#    #syscall
-#
-#    addi $t0,$t0,1 # i++
-#    blt  $t0,$t3,PILOOP   # go to iloop if i < 3
-
-
-    # finished: exit
-    #ori   $v0,$zero,10
-    #syscall

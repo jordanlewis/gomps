@@ -10,10 +10,11 @@ import (
 )
 
 var verbose *bool = flag.Bool("v", false, "full verbosity");
+var multissue *bool = flag.Bool("m", false, "use the pipeline");
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Printf("usage: gomps input.s\n");
+		fmt.Printf("usage: gomps [-vm] input.s\n");
 		os.Exit(1);
 	}
 	flag.Parse();
@@ -31,5 +32,5 @@ func main() {
 	}
 	c.Instrs = p.Instlist;
 	c.Mem = p.Memory;
-	c.Execute();
+	c.Execute(*multissue);
 }

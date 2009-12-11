@@ -111,6 +111,7 @@ func (p *Pipeline) Step() {
 	   pipeline latches. */
 
 	/* writeback:  */
+	var hazard bool = false;
 	if p.memwb.full {
 		p.memwb.was_full = true;
 		debug.Debug("WRITE: ");
@@ -161,7 +162,7 @@ func (p *Pipeline) Step() {
 				p.cpu.Mem[p.exmem.alu_out] = p.exmem.reg_b;
 				debug.Debug("STOR inst: mem[alu_out] <- reg_b: ");
 			case t.LA:
-				if p.ifid.inst.TGT.Section == 0 {
+				if p.exmem.inst.TGT.Section == 0 {
 					fmt.Printf("Loading from text section? Sorry dave...\n");
 					os.Exit(-1);
 				}
@@ -178,6 +179,26 @@ func (p *Pipeline) Step() {
 	/* exec */
 	if p.idex.full {
 		debug.Debug("EXEC: ");
+
+		hazard = false;
+		/* Check for RAW data hazards */
+		if p.ifid.full {
+			switch p.idex.inst.Opname {
+			case t.LA, t.LB, t.LW, t.LH:
+				if inst.AType[p.ifid.inst.Opname] == inst.RRR &&
+					(p.idex.inst.RT == p.ifid.inst.RS ||
+					 p.idex.inst.RT == p.ifid.inst.RT) {
+					hazard = true;
+				}
+				switch p.ifid.inst.Opname {
+				case t.LA, t.LB, t.LW, t.LH, t.SB, t.SW, t.SH, t.ADDI, t.ADDIU, t.LUI, t.ANDI, t.ORI, t.XORI:
+					if p.idex.inst.RT == p.ifid.inst.RS {
+						hazard = true;
+					}
+				}
+			}
+		}
+
 		switch inst.IType[p.idex.inst.Opname] {
 		case inst.ARITH:
 			p.exmem.inst = p.idex.inst;
@@ -198,15 +219,18 @@ func (p *Pipeline) Step() {
 	/* decode */
 	if p.ifid.full {
 		debug.Debug("DECODE: ");
-		p.idex.reg_a = p.cpu.Regs[p.ifid.inst.RS];
-		p.idex.reg_b = p.cpu.Regs[p.ifid.inst.RT];
-		p.idex.npc = p.ifid.npc;
-		p.idex.inst = p.ifid.inst;
-		p.idex.imm = uint32(p.ifid.inst.IMM); /* Sign extend? */
-		debug.Debug("%s\n", p.idex.String());
 
-		p.idex.full = true;
-		p.ifid.full = false;
+
+		if !hazard {
+			p.idex.reg_a = p.cpu.Regs[p.ifid.inst.RS];
+			p.idex.reg_b = p.cpu.Regs[p.ifid.inst.RT];
+			p.idex.npc = p.ifid.npc;
+			p.idex.inst = p.ifid.inst;
+			p.idex.imm = uint32(p.ifid.inst.IMM); /* Sign extend? */
+			debug.Debug("%s\n", p.idex.String());
+			p.idex.full = true;
+			p.ifid.full = false;
+		}
 	}
 
 	/* fetch: calcuate next PC, fetch operands */
@@ -258,7 +282,7 @@ func (p *Pipeline) Step() {
 
 	debug.PPrint("%d:", p.cpu.cycles);
 	//if p.ifid.full { debug.PPrint("\t%s %s\t", p.ifid.inst.Opname.String(), p.ifid.inst.String()) }
-	if p.ifid.full { debug.PPrint("\t%s", p.ifid.inst.Opname.String()) }
+	if p.ifid.full { debug.PPrint("\t%s\t", p.ifid.inst.Opname.String()) }
 	else { debug.PPrint ("\t\t") }
 	if p.idex.full { debug.PPrint("%s\t", p.idex.inst.Opname.String()) }
 	else { debug.PPrint ("\t") }
@@ -280,16 +304,22 @@ func (c *CPU) Init() {
 	c.Pipeline = &Pipeline{c, false, ifid_buf{}, idex_buf{}, exmem_buf{}, memwb_buf{}}
 }
 
-func (c *CPU) Execute() {
-	for c.pc < uint32(c.Instrs.Len()){
-		c.Pipeline.Dispatch();
-		c.Pipeline.Step();
-		c.Pipeline.Step();
-		c.Pipeline.Step();
-		c.Pipeline.Step();
-		c.Pipeline.Step();
-		//c.printMem();
-		//c.printRegs();
+func (c *CPU) Execute(multissue bool) {
+	if !multissue {
+		for c.pc < uint32(c.Instrs.Len()){
+			c.Pipeline.Dispatch();
+			c.Pipeline.Step();
+			c.Pipeline.Step();
+			c.Pipeline.Step();
+			c.Pipeline.Step();
+			c.Pipeline.Step();
+		}
+	}
+	else {
+		for c.pc < uint32(c.Instrs.Len()){
+			c.Pipeline.Dispatch();
+			c.Pipeline.Step();
+		}
 	}
 	//c.printRegs();
 	c.printMem();

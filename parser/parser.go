@@ -106,7 +106,15 @@ func (p *parser) Parse() {
 				}
 				first_time = false;
 			}
-		case t.D_ASCIIZ, t.D_SPACE:
+		case t.D_ASCIIZ:
+			p.expect(t.STRING);
+			fmt.Printf("%d %s\n", len(p.str), p.str);
+			for i := 1; i < len(p.str) - 1; i++ {
+				p.Memory[p.CurMemPos] = uint32(p.str[i]);
+				p.CurMemPos += 1;
+			}
+			p.next();
+		case t.D_SPACE:
 			p.next();
 			continue;
 		default:
