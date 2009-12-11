@@ -4,6 +4,7 @@ import (
 	t "gomps/token";
 	"gomps/debug";
 	"gomps/inst";
+	"os";
 	"fmt";
 	"container/vector";
 )
@@ -13,14 +14,24 @@ type CPU struct {
 	cycles int;
 	Regs [32]uint32;
 	pc uint32;
-	Instlabs map[string] int;
-	Datalabs map[string] int;
+	Data *vector.Vector;
 	Instrs *vector.Vector;
 	Pipeline *Pipeline;
-	mem [1024]uint32;
-	alu_res uint32;
-	mem_res uint32;
-	ins_reg *inst.Inst;
+	Mem [1024]uint32;
+	lo_reg uint32;
+	hi_reg uint32;
+}
+
+func (c *CPU) printRegs() {
+	for s, i := range inst.Regmap {
+		fmt.Printf("%s (%d) = %d\n", s, i, c.Regs[int(i)]);
+	}
+}
+
+func (c *CPU) printMem() {
+	for i := 0; i < 30; i++ {
+		fmt.Printf("mem[%d] = %d\n", i*4, c.Mem[i*4]);
+	}
 }
 
 type Pipeline struct {
@@ -90,9 +101,6 @@ func (p *Pipeline) Dispatch() {
 	if !p.ready {
 		debug.Debug("Dispatching new instruction\n");
 		p.ready = true;
-		//p.ifid.full = true;
-		//p.ifid.inst = p.cpu.get_inst_at_pc();
-		//p.ifid.npc = p.cpu.pc + 1;
 	}
 	//debug.Debug("Dispatch: from pc = %d, next inst = %s\n", p.cpu.pc, p.ins_reg.String());
 }
@@ -109,7 +117,7 @@ func (p *Pipeline) Step() {
 		switch inst.IType[p.memwb.inst.Opname] {
 		case inst.ARITH:
 			switch p.memwb.inst.Opname {
-			case t.ADD, t.ADDU, t.AND, t.NOR, t.OR, t.SUB, t.SUBU, t.XOR:
+			case t.ADD, t.ADDU, t.AND, t.NOR, t.OR, t.SUB, t.SUBU, t.XOR, t.MFLO, t.MFHI:
 				p.cpu.Regs[p.memwb.inst.RD] = p.memwb.alu_out;
 				debug.Debug("Reg[%d] <- ALU_OUT (%d): ", p.memwb.inst.RD,p.memwb.alu_out)
 			case t.ADDI, t.ANDI, t.ORI, t.XORI:
@@ -123,6 +131,9 @@ func (p *Pipeline) Step() {
 				debug.Debug("Reg[%d] <- LMD (%d): ",p.memwb.inst.RT,p.memwb.lmd)
 			case t.SB, t.SH, t.SW:
 				debug.Debug("got a store, doing nothing: ");
+			case t.LA:
+				p.cpu.Regs[p.memwb.inst.RS] = p.memwb.lmd;
+				debug.Debug("Reg[%d] <- LMD (%d): ",p.memwb.inst.RS,p.memwb.lmd)
 			}
 		case inst.BRANCH:
 			debug.Debug("got a branch, doing nothing: ");
@@ -144,13 +155,17 @@ func (p *Pipeline) Step() {
 			p.memwb.inst = p.exmem.inst;
 			switch p.exmem.inst.Opname {
 			case t.LB, t.LH, t.LW:
-				p.memwb.lmd = p.cpu.mem[p.exmem.alu_out];
+				p.memwb.lmd = p.cpu.Mem[p.exmem.alu_out];
 				debug.Debug("LOAD inst: LMD <- mem[alu_out]: ");
 			case t.SB, t.SH, t.SW:
-				p.cpu.mem[p.exmem.alu_out] = p.exmem.reg_b;
+				p.cpu.Mem[p.exmem.alu_out] = p.exmem.reg_b;
 				debug.Debug("STOR inst: mem[alu_out] <- reg_b: ");
 			case t.LA:
-				p.memwb.lmd = uint32(p.ifid.inst.TGT);
+				if p.ifid.inst.TGT.Section == 0 {
+					fmt.Printf("Loading from text section? Sorry dave...\n");
+					os.Exit(-1);
+				}
+				p.memwb.lmd=uint32(p.ifid.inst.TGT.Offset);
 			}
 			p.memwb.full = true;
 		case inst.BRANCH:
@@ -166,7 +181,7 @@ func (p *Pipeline) Step() {
 		switch inst.IType[p.idex.inst.Opname] {
 		case inst.ARITH:
 			p.exmem.inst = p.idex.inst;
-			p.exmem.alu_out = do_arith(&p.idex);
+			p.exmem.alu_out = do_arith(p.cpu, &p.idex);
 		case inst.LOSTO:
 			p.exmem.inst = p.idex.inst;
 			p.exmem.alu_out = p.idex.reg_a + p.idex.imm;
@@ -219,14 +234,19 @@ func (p *Pipeline) Step() {
 			}
 		}
 		if branch {
-			p.ifid.npc = uint32(p.ifid.inst.TGT);
+			if p.ifid.inst.TGT.Section == 1 {
+				debug.Debug("Trying to branch to data section? Uhoh...\n");
+			}
+			p.ifid.npc = uint32(p.ifid.inst.TGT.Offset);
 		} else {
 			p.ifid.npc = p.cpu.pc + 1;
 		}
 		p.cpu.pc = p.ifid.npc;
 		//debug.Debug("%s\n", p.ifid.String());
 
-		p.ifid.full = true;
+		if !branch {
+			p.ifid.full = true;
+		}
 		p.ready = false;
 	}
 
@@ -237,7 +257,8 @@ func (p *Pipeline) Step() {
 	p.cpu.cycles += 1;
 
 	debug.PPrint("%d:", p.cpu.cycles);
-	if p.ifid.full { debug.PPrint("\t%s\t", p.ifid.inst.Opname.String()) }
+	//if p.ifid.full { debug.PPrint("\t%s %s\t", p.ifid.inst.Opname.String(), p.ifid.inst.String()) }
+	if p.ifid.full { debug.PPrint("\t%s", p.ifid.inst.Opname.String()) }
 	else { debug.PPrint ("\t\t") }
 	if p.idex.full { debug.PPrint("%s\t", p.idex.inst.Opname.String()) }
 	else { debug.PPrint ("\t") }
@@ -267,14 +288,18 @@ func (c *CPU) Execute() {
 		c.Pipeline.Step();
 		c.Pipeline.Step();
 		c.Pipeline.Step();
+		//c.printMem();
+		//c.printRegs();
 	}
+	//c.printRegs();
+	c.printMem();
 }
 
 func (c *CPU)get_inst_at_pc() *inst.Inst {
 	return c.Instrs.At(int(c.pc)).(*inst.Inst);
 }
 
-func do_arith(idex *idex_buf) (ret uint32) {
+func do_arith(c *CPU, idex *idex_buf) (ret uint32) {
 	switch idex.inst.Opname {
 	case t.ADD, t.ADDU: ret = idex.reg_a + idex.reg_b;
 	case t.ADDI, t.ADDIU: ret = idex.reg_a + idex.imm;
@@ -298,12 +323,12 @@ func do_arith(idex *idex_buf) (ret uint32) {
 //	case t.MSUB:
 //	case t.MSUBU:
 //	case t.MUL:
-//	case t.MULT:
+	case t.MULT: c.lo_reg = idex.reg_a * idex.reg_b; ret = 0;
 //	case t.MULTU:
 
 /* Accumulator access */
-//	case t.MFHI:
-//	case t.MFLO:
+	case t.MFHI: ret = c.hi_reg;
+	case t.MFLO: ret = c.lo_reg;
 //	case t.MTHI:
 //	case t.MTLO:
 	}

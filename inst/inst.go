@@ -9,7 +9,20 @@ type ArgType int;
 type InstType int;
 
 type RegT uint8;
-type LabelT uint16;
+type LabelT struct {
+	Section int;
+	Offset uint16;
+}
+func (l *LabelT) String() string {
+	var secstr string;
+	if l.Section == 0 {
+		secstr = "text"
+	} else {
+		secstr = "data"
+	}
+	return fmt.Sprintf("%s:%d", secstr, l.Offset);
+}
+
 type ImmT uint32;
 
 
@@ -20,14 +33,14 @@ type Inst struct {
 	RD RegT;
 	SA uint8;
 	IMM int;
-	TGT LabelT;
+	TGT *LabelT;
 }
 
 func (i *Inst) String() string {
-	return fmt.Sprintf("inst(%s: %d %d %d %d %d %d)", i.Opname.String(), i.RS, i.RT, i.RD, i.SA, i.IMM, i.TGT);
+	return fmt.Sprintf("inst(%s: %d %d %d %d %d %s)", i.Opname.String(), i.RS, i.RT, i.RD, i.SA, i.IMM, i.TGT.String());
 }
 
-var regnum = map[string] RegT {
+var Regmap = map[string] RegT {
 	"$zero": 0,
 	"$at":1,
 	"$v0":2, "$v1":3,
@@ -39,8 +52,9 @@ var regnum = map[string] RegT {
 	"$gp":28, "$sp":29, "$fp":30, "$ra":31
 }
 
+
 func Regnum(str []byte) RegT {
-	return regnum[string(str)];
+	return Regmap[string(str)];
 }
 
 const ( // R = register, I = immed, A = address, L = label, S = string
@@ -66,6 +80,7 @@ const (
 	ARITH = iota;
 	LOSTO;
 	BRANCH;
+	DIRECT;
 )
 
 var IType = map[token.Token] InstType {
@@ -128,6 +143,14 @@ var IType = map[token.Token] InstType {
 	token.SB: LOSTO,
 	token.SH: LOSTO,
 	token.SW: LOSTO,
+
+	token.D_ALIGN:	DIRECT,
+	token.D_ASCIIZ:	DIRECT,
+	token.D_BYTE:	DIRECT,
+	token.D_DATA:	DIRECT,
+	token.D_SPACE:	DIRECT,
+	token.D_TEXT:	DIRECT,
+	token.D_WORD:	DIRECT,
 }
 
 var AType = map[token.Token] ArgType {

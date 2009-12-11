@@ -27,10 +27,11 @@ type parser struct {
 	section uint;
 
 	Instlist *vector.Vector;
-	datalist *vector.Vector;
+	Datalist *vector.Vector;
+	Memory [1024]uint32;
+	CurMemPos uint16;
 
-	Instlabs map[string] inst.LabelT;
-	Datalabs map[string] inst.LabelT;
+	Labels map[string] *inst.LabelT;
 
 	pos t.Position;
 	tok t.Token;
@@ -42,9 +43,8 @@ func (p *parser) init(filename string, input []byte) {
 	p.trace = true;
 	p.scanner.Init(filename, input, p);
 	p.Instlist = vector.New(0);
-	p.datalist = vector.New(0);
-	p.Instlabs = make(map[string] inst.LabelT);
-	p.Datalabs = make(map[string] inst.LabelT);
+	p.Datalist = vector.New(0);
+	p.Labels = make(map[string] *inst.LabelT);
 	p.next();
 }
 
@@ -65,7 +65,6 @@ func (p *parser) expect(tok t.Token) {
 	}
 }
 
-
 func (p *parser) Parse() {
 	for p.tok != t.EOF {
 		switch p.tok {
@@ -76,12 +75,14 @@ func (p *parser) Parse() {
 			p.section = 0;
 			p.next();
 		case t.LABEL:
-			fmt.Printf("label is %s %s\n", p.str, string(p.str[0:len(p.str)-1]));
+			fmt.Printf("label is %s %s\n",p.str, string(p.str[0:len(p.str)-1]));
+			var lab *inst.LabelT;
 			if p.section == 0 {
-				p.Instlabs[string(p.str[0:len(p.str)-1])] = inst.LabelT(p.Instlist.Len());
+				lab = &inst.LabelT{0, uint16(p.Instlist.Len())};
 			} else {
-				p.Datalabs[string(p.str[0:len(p.str)-1])] = inst.LabelT(p.datalist.Len());
+				lab = &inst.LabelT{1, p.CurMemPos};
 			}
+			p.Labels[string(p.str[0:len(p.str)-1])] = lab;
 			p.next();
 		case t.D_WORD:
 			first_time := true;
@@ -98,7 +99,8 @@ func (p *parser) Parse() {
 				}
 				if p.tok == t.INT {
 					i, _ := strconv.Atoi(string(p.str));
-					p.datalist.Push(i);
+					p.Memory[p.CurMemPos] = uint32(i);
+					p.CurMemPos += 4;
 				} else {
 					p.Error(p.pos, "Nonint in .word");
 				}
@@ -108,7 +110,8 @@ func (p *parser) Parse() {
 			p.next();
 			continue;
 		default:
-			newInst := &inst.Inst{p.tok, 0,0,0,0,0,0};
+			var pushInst bool = true;
+			newInst := &inst.Inst{p.tok,0,0,0,0,0,&inst.LabelT{}};
 			debug.Debug("Trying to parse a %s: ", p.str);
 			switch ty, _ := inst.AType[p.tok]; ty {
 			case inst.RRR:
@@ -127,8 +130,9 @@ func (p *parser) Parse() {
 				p.expect(t.REG);
 				newInst.RT = inst.Regnum(p.str);
 			case inst.R:
+				tok := p.tok;
 				p.expect(t.REG);
-				switch p.tok {
+				switch tok {
 				case t.MFHI, t.MFLO:
 					newInst.RD = inst.Regnum(p.str);
 				case t.MTHI, t.MTLO, t.JR:
@@ -151,13 +155,13 @@ func (p *parser) Parse() {
 				newInst.RT = inst.Regnum(p.str);
 				p.expect(t.COMMA);
 				p.expect(t.IDENT);
-				newInst.TGT = p.Instlabs[string(p.str)];
+				newInst.TGT = p.Labels[string(p.str)];
 			case inst.RL:
 				p.expect(t.REG);
 				newInst.RS = inst.Regnum(p.str);
 				p.expect(t.COMMA);
 				p.expect(t.IDENT);
-				newInst.TGT = p.Instlabs[string(p.str)];
+				newInst.TGT = p.Labels[string(p.str)];
 			case inst.RIR:
 				p.expect(t.REG);
 				newInst.RT = inst.Regnum(p.str);
@@ -176,12 +180,15 @@ func (p *parser) Parse() {
 				newInst.IMM, _ = strconv.Atoi(string(p.str));
 			case inst.L:
 				p.expect(t.IDENT);
-				newInst.TGT = p.Instlabs[string(p.str)];
+				newInst.TGT = p.Labels[string(p.str)];
 			default:
+				pushInst = false;
 				fmt.Printf("Ignoring token %s\n",p.str); 
 				p.next();
 			}
-			p.Instlist.Push(newInst);
+			if pushInst {
+				p.Instlist.Push(newInst);
+			}
 			p.next();
 		}
 	}

@@ -30,5 +30,6 @@ func main() {
 		fmt.Printf("%s\n", err.String());
 	}
 	c.Instrs = p.Instlist;
-	c.Execute()
+	c.Mem = p.Memory;
+	c.Execute();
 }
